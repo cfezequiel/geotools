@@ -1,6 +1,0 @@
-[apm2pix4uav] Version 2.3
-- Redirected logging information into a file for reporting
-- Removed temporary code for DOLE project (i.e. replacing .jpg with .tiff in output file)
-- Added option to change image file extensions in output file (--extension)
-- Added option to include header row in output file (--header)
-- Changed default output file from pix4uav.txt to georef.csv

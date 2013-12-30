@@ -1,6 +1,0 @@
-Added correction for leap seconds when converting from UTC to GPS
-in image timestamp
-
-Added cam trigger vs image time offset parameter
-
-Added linear interpolation algorithm as an alternative to the time matching, nearest neighbor interpolation algorithm
