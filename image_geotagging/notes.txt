@@ -1,0 +1,9 @@
+- Geotagging photos
+    - GExiv2 (Python)
+        - Needs libexiv2-dev (C++)
+        - Link: http://redmine.yorba.org/projects/gexiv2/wiki 
+
+    - KML
+        - Photos aren't geotagged
+        - KML file contains the coordinates
+        

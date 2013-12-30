@@ -1,0 +1,355 @@
+#! /usr/bin/python
+
+import logging
+import argparse
+import csv
+from subprocess import check_output, CalledProcessError
+from cStringIO import StringIO
+from os import listdir, path, walk
+import imghdr
+from math import sqrt
+import time
+from fnmatch import fnmatch
+import bisect
+
+# Third-party libraries
+import lxml
+import exifread
+
+DEBUG = logging.debug
+logging.basicConfig(level=logging.INFO)
+
+# Acceptable images
+image_ext = ['tiff', 'jpg', 'jpeg']
+
+# Leap seconds between UTC and GPS times
+leap_seconds = 16
+
+# Offset between GPS camera trigger log and image (in seconds)
+gps_vs_image_offset = 1
+
+class Image:
+    '''Image information.'''
+
+    def __init__(self, name, root_dir='.'):
+        self.__name = name
+        self.__root_dir = root_dir
+        self.__time_created = self.__get_time_created(root_dir + '/' + name)
+
+    def __get_time_created(self, fn):
+        '''Get creation time in seconds after epoch time.'''
+
+        # Get time tuple in localtime
+        try:
+            # Try to get timestamp from EXIF information
+            fp = open(fn, 'rb')
+            tags = exifread.process_file(fp)
+            date_time_original = str(tags['EXIF DateTimeOriginal'])
+            fmt = '%Y:%m:%d %H:%M:%S'
+            t = time.strptime(date_time_original, fmt)
+            
+        except:
+            # In case EXIF data does not exist (i.e. RAW image)
+            t = time.localtime(path.getmtime(fn))
+
+        # Convert to GPS seconds
+        ts = (t.tm_wday + 1) * 24 * 60 * 60 + t.tm_hour * 60 * 60 + t.tm_min * 60 + t.tm_sec
+        ts += time.timezone + leap_seconds
+
+        return ts
+
+    def filename(self):
+        return self.__name
+
+    def filepath(self):
+        return self.__root_dir + '/' + self.__name
+
+    def timestamp(self):
+        '''Return timestamp as GPS seconds since start of week.'''
+
+        return self.__time_created
+
+    def __repr__(self):
+        return str([self.filename(), self.timestamp(), self.__root_dir])
+
+class GPS:
+    def __init__(self, lat, lon, alt=0):
+        self.lat = lat
+        self.lon = lon
+        self.alt = alt
+
+class IMU:
+    def __init__(self, roll, pitch, yaw):
+        self.roll = roll
+        self.pitch = pitch
+        self.yaw = yaw
+
+class Pose:
+    '''UAV pose, which includes GPS and IMU information'''
+
+    def __init__(self, time, gps, imu=None):
+        self.__time = time
+        self.__gps = gps
+        self.__imu = imu
+
+    def __repr__(self):
+        li = [self.__time, self.__gps.lat, self.__gps.lon, self.__gps.alt]
+        if self.__imu:
+            li += [self.__imu.roll, self.__imu.pitch, self.__imu.yaw]
+
+        return str(li)
+
+    def gps(self):
+        return self.__gps
+
+    def imu(self):
+        return self.__imu
+
+    def timestamp(self):
+        return self.__time
+
+#FIXME: unused
+def time_delta(beg, end):
+    '''Get time difference between datetime objects in seconds.'''
+
+    return int((end - beg).total_seconds())
+
+def gps_to_local_time(gps_seconds, gps_week):
+    '''Convert GPS time to local time_struct (see time module).'''
+    pass
+
+
+def isimage(filename):
+    try:
+        ext = imghdr.what(filename)
+    except IOError:
+        return False
+
+    if ext in image_ext:
+        return True
+    return False
+
+def get_images(source_dir):
+    assert path.exists(source_dir)
+    assert path.isdir(source_dir)
+    images = []
+
+    # Read images from source directory
+    root = source_dir
+    files = listdir(root)
+    images = [Image(f, root) for f in files if isimage(root + '/' + f)]
+
+    # Sort images by time
+    images.sort(key=lambda image: image.timestamp())
+
+    return images
+
+def get_logfile(source_dir):
+    assert path.exists(source_dir)
+    assert path.isdir(source_dir)
+
+    # Get the first *.log file found in source directory
+    for fn in listdir(source_dir):
+        if fnmatch(fn, '*.log'):
+            return source_dir + '/' + fn
+
+def parse_apm_log_file(logfile):
+    '''Read CAM entries from APM log file, which define the UAV pose at time camera was triggered.'''
+
+    o = check_output(['grep', '^CAM', logfile])
+    sp = StringIO(o)
+    reader = csv.reader(sp, delimiter=',')
+    pose_info= []
+    for row in reader:
+        # Convert GPS time in milliseconds to GPS seconds since start of week
+        time = int(row[1]) / 1000
+        gps = GPS(float(row[3]), float(row[4]), float(row[5]))
+        imu = IMU(float(row[6]), float(row[7]), float(row[8]))
+        pose = Pose(time, gps, imu)
+        pose_info.append(pose)
+
+    # Sort
+    pose_info.sort(key=lambda pi: pi.timestamp())
+
+    return pose_info 
+
+def parse_apm_gpx_file(gpx_file):
+    '''Parse an APM GPX file for Pose information.'''
+
+    # TODO
+    pass
+
+def match(x, seqy, y_idx_lo=0):
+    '''Find y closest to the value of a given x in a given set of y values.
+
+    Returns (y, index of y in seqy)
+    
+    '''
+
+    # Find closest match 
+    idx = bisect.bisect_left(seqy, x, y_idx_lo)
+    if idx == 0: # Corner case: lower bound 
+        y_idx = idx
+
+    elif idx > 0 and idx < len(seqy): # Common case: between
+        y_idx_lo = idx - 1
+        error = abs(seqy[idx] - x)
+        error_lo = abs(seqy[y_idx_lo] - x)
+        if error_lo < error:
+            y_idx = y_idx_lo
+        else:
+            y_idx = idx
+
+    else: # Corner case: upper bound
+        y_idx = idx - 1
+
+    y = seqy[y_idx]
+
+    return (y, y_idx)
+
+def interpolate_nn(ts_images, ts_pose_info, analyze=False):
+
+    image_times = sorted(ts_images.keys());
+    pose_times = sorted(ts_pose_info.keys());
+
+    pairings = []
+    pose_times_idx_lo = 0
+    for image_time in image_times:
+        (pose_time, pose_times_idx_lo) = match(image_time, pose_times, pose_times_idx_lo)
+        pairings.append((image_time, pose_time))
+
+    # Filter out duplicates
+    seen = set()
+    pairings = [(x, y) for x,y in pairings if x not in seen and not seen.add(x)]
+
+    georef_images = []
+    for image_time, pose_time in pairings:
+        georef_images.append((ts_images[image_time], ts_pose_info[pose_time]))
+
+    # Do some post-processing analysis
+    if analyze:
+        errors = []
+        pose_ts_list = [p[1] for p in image_pose_pairs]
+        for pose in pose_info:
+            indices = [i for i, x in enumerate(image_pose_pairs) if x[1] == pose_ts]
+            image_ts_list = [image_pose_pairs[i][0] for i in indices]
+            if image_ts_list:
+                for image_ts in image_ts_list:
+                    error = abs(image_ts - pose_ts)
+                    errors.append(error)
+                    print('Pose(t=%d) <- Image(t=%d): error = %d' % (pose_ts, image_ts, error))
+            else:
+                print('Pose(t=%d)' % pose_ts)
+        mse = (1.0/len(errors)) * sum([e**2 for e in errors])
+        print('Mean-squared-error = %.2f' % mse)
+
+    return georef_images
+
+def interpolate_linear(x, x0, y0, x1, y1):
+    '''Returns value of y for given x given two bounding points (x0, y0) and (x1, y1).'''
+
+    assert x1 > x
+    assert x > x0
+
+    tau = (x - x0) / (x1 - x0)
+    y = tau * y1 + (1 - tau) * y0
+
+    return y
+
+def analyze(georef_images, images, pose_info):
+
+def georeference_images(images, pose_info, analyze=False):
+    #NOTE: This relies on the first image and first Pose entry
+    #to match. Otherwise, everything else will not match correctly
+
+    # Get initial times
+    image_t0 = images[0].timestamp() + gps_vs_image_offset
+    pose_t0 = pose_info[0].timestamp()
+
+    # Create dictionary of image and pose timestamps based on their initial times
+    # respectively
+    ts_images = dict([(image.timestamp() - image_t0, image) for image in images])
+    ts_pose_info = dict([(pose.timestamp() - pose_t0, pose) for pose in pose_info])
+
+    # Run interpolation algorithm
+    # TODO: support other algorithms
+    georef_images = interpolate_nn(ts_images, ts_pose_info, analyze):
+
+    return georef_images
+
+def gen_pix4uav_file(geo_images, output_file, exclude_imu=False):
+
+    with open(output_file, 'wb') as outfp:
+        writer = csv.writer(outfp, delimiter=',')
+        fmt6 = '{:.6f}'
+        fmt2 = '{:.2f}'
+        for image, pose in geo_images:
+            gps = pose.gps()
+            entry = [image.filename(), fmt6.format(gps.lat), fmt6.format(gps.lon),
+                    fmt2.format(gps.alt)]
+            imu = pose.imu()
+            if not exclude_imu and imu:
+                entry += [fmt2.format(imu.yaw), fmt2.format(imu.pitch), fmt2.format(imu.roll)]
+            writer.writerow(entry)
+            
+if __name__ == '__main__':
+
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+            description=
+            '''
+            Create Pix4UAV input file from images and APM logs.
+            '''
+            , epilog=
+            '''
+            Note: In order to produce good georeferencing of images, make sure that the first image 
+            and the first Pose entry of the APM log have near-matching timestamps (error at most 2s).
+            '''
+            )
+    parser.add_argument('source', type=str, 
+            help='Source directory for images and the APM log file (*.log)')
+    parser.add_argument('--logfile', type=str, default=None,
+            help='APM log file (*.log)')
+    parser.add_argument('-o', '--output', default='pix4uav.txt', 
+            help='Output Pix4UAV file [default: pix4uav.txt]')
+    parser.add_argument('-d', '--output_dir', 
+            help='Set the output directory for the pix4UAV file [default: source directory]')
+    parser.add_argument('--exclude_imu', action='store_true', 
+            help='Exclude IMU info (yaw, pitch, roll) from output file')
+    parser.add_argument('--analyze', action='store_true', default=False,
+            help='Output image-pose matching information')
+    parser.add_argument('--no_interpolation', action='store_true', default=False,
+            help='Do not perform linear interpolation in georeferencing')
+    args = parser.parse_args()
+
+    # Get image filenames
+    images = get_images(args.source)
+    logging.info('Found %d images in %s' % (len(images), args.source))
+
+    # Get log file from source directory if not explicitly given
+    if not args.logfile:
+        logfile = get_logfile(args.source)
+    else:
+        logfile = args.logfile
+
+    # Read Pose data from APM log file
+    pose_info = parse_apm_log_file(logfile)
+    logging.info('Found %d camera pose entries in "%s".' % (len(pose_info), logfile))
+
+    # Georeference images
+    logging.info('Georeferencing images ...')
+    georef_images = georeference_images(images, pose_info, args.analyze)
+
+    # Generate Pix4UAV File
+    logging.info('Creating Pix4UAV file...')
+    if args.output_dir:
+        output_dir = args.output_dir
+    else:
+        output_dir = args.source
+    output_file = output_dir + '/' + args.output
+    gen_pix4uav_file(georef_images, output_file, exclude_imu=args.exclude_imu)
+
+    logging.info('Done.')
+
+
+
