@@ -4,7 +4,6 @@
 Generates a KML file from another GIS file (i.e. APM, Pix4UAV, etc.)
 
 author: Carlos F. Ezequiel
-version: 1.0
 '''
 
 import re
@@ -35,7 +34,7 @@ def check_filetype(filename):
         with open(filename, 'rt') as fp:
             if '\n'.join(fp.readlines()).find('CAM') >= 0:
                 return 'APM'
-    elif ext == '.txt':
+    elif ext == '.txt' or ext == '.csv':
         with open(filename, 'rt') as fp:
             reader = csv.reader(fp, delimiter=',')
             row = reader.next()
@@ -49,12 +48,9 @@ def read_pix4uav_file(filename):
 
     fp = open(filename, 'rt')
     reader = csv.reader(fp, delimiter=',')
-    data = []
     for row in reader:
-        data.append(tuple([s.strip() for s in row]))
+        yield tuple([s.strip() for s in row])
 
-    return data
-        
 def get_apm_version(logfile):
     '''Get APM version number (Vx.xx) of an APM log file.'''
 
@@ -78,19 +74,15 @@ def read_apm_log_file(filename):
     version = get_apm_log_version(filename)
 
     # Read APM log file
-    fp = open(filename, 'rt')
-    data = []
-    for line in fp.readlines():
+    for line in open(filename, 'rt'):
         if line.find('CAM') == 0:
             tokens = [s.strip() for s in line.split(',')]
             if version >= 2.76:
                 tokens = tokens[2:]
             else:
                 tokens = tokens[1:]
-            data.append(tuple(tokens))
+            yield tuple(tokens)
             
-    return data
-
 
 if __name__ == '__main__':
 
@@ -107,11 +99,10 @@ if __name__ == '__main__':
     filename = args.source
     filetype = check_filetype(filename)
     #assert filetype != '' #DEBUG
-    data = []
     if filetype == 'APM':
-        data = read_apm_log_file(filename)
+        read_log = read_apm_log_file
     elif filetype == 'PIX4UAV':
-        data = read_pix4uav_file(filename)
+        read_log = read_pix4uav_file
 
     # Create KML document
     doc = KML.Document(
@@ -128,9 +119,10 @@ if __name__ == '__main__':
                 )
             )
 
+    # Create KML content
     path_data = []
     idx = 1;
-    for row in data:
+    for row in read_log(filename):
         name = row[0]
         lat = row[1]
         lon = row[2]

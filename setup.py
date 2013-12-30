@@ -8,5 +8,5 @@ setup(name='gistools',
       author_email='carlosezequiel@skyeyeproject.com',
       license='MIT',
       packages=['gistools'],
-      scripts=['bin/georef.py'],
+      scripts=['bin/georef.py', 'bin/genkml.py'],
       zip_safe=False)
