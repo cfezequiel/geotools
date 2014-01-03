@@ -6,7 +6,7 @@ Georeferences a set of images with GPS/IMU information.
 Currently supports APM log files only.
 
 author: Carlos F. Ezequiel
-version: 2.3
+version: 2.4
 '''
 
 import logging 
@@ -526,7 +526,7 @@ if __name__ == '__main__':
             # Check if timestamps of starting image and starting pose_info 
             # are within a threshold error
             error = images[0].timestamp() - pose_info[0].timestamp() + args.offset
-            logging.info('Difference between initial image and pose time: %d ' % diff)
+            logging.info('Difference between initial image and pose time: %d ' % error)
             if  error > image_cam_time_threshold:
                 logging.error('Difference between initial image and CAM entry time is too large')
                 exit(1)
