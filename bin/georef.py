@@ -6,7 +6,7 @@ Georeferences a set of images with GPS/IMU information.
 Currently supports APM log files only.
 
 author: Carlos F. Ezequiel
-version: 2.4
+version: 2.5
 '''
 
 import logging 
@@ -21,20 +21,12 @@ from fnmatch import fnmatch
 import bisect
 import warnings
 
-# Third-party libraries
-try:
-    import exifread
-except ImportError:
-    warnings.warn('Module not found: exifread')
-
-try:
-    import exiftool
-except ImportError:
-    warnings.warn('Module not found: exiftool')
+# From package
+from gistools import timeutil
 
 #======================== SETTINGS =========================
 # Reporting
-report_filename = 'report_georef.txt'
+report_filename = 'report_georef_%s.txt' % time.strftime('%Y_%m_%d_%H_%M_%S')
 logging.basicConfig(
         filename=report_filename, 
         level=logging.INFO,
@@ -66,32 +58,8 @@ class Image:
     def __get_time_created(self, fn):
         '''Get creation time in seconds after epoch time.'''
 
-        # Get time tuple in localtime
-        try:
-            # Use exifread
-            fp = open(fn, 'rb')
-            date_time_original = ''
-            tags = exifread.process_file(fp)
-            if tags:
-                date_time_original = str(tags['EXIF DateTimeOriginal'])
-            else:
-                # Use exiftool
-                with exiftool.ExifTool() as et:
-                    md = et.get_metadata(fn)
-                    date_time_original = str(md['EXIF:DateTimeOriginal'])
-
-            # Parse timestamp string
-            fmt = '%Y:%m:%d %H:%M:%S'
-            t = time.strptime(date_time_original, fmt)
-            
-        except:
-            # In case EXIF data does not exist
-            logging.warning('Could not read EXIF data -> %s. Using file modified time' % fn)
-            t = time.localtime(path.getmtime(fn))
-
-        # Convert to GPS seconds
-        ts = (t.tm_wday + 1) % 7 * 24 * 60 * 60 + t.tm_hour * 60 * 60 + t.tm_min * 60 + t.tm_sec
-        ts += time.timezone + leap_seconds
+        t = timeutil.get_timestamp(fn)
+        ts = timeutil.gps_seconds(t)
 
         # Convert to GPS milliseconds
         ts *= multiplier['ms']
@@ -543,8 +511,6 @@ if __name__ == '__main__':
     else:
         output_dir = args.source
     output_filename = args.output
-    if args.algorithm == 'linear':
-        output_filename = '_linear'.join(path.splitext(output_filename))
 
     output_file = output_dir + '/' + output_filename
     gen_pix4uav_file(georef_images, output_file, exclude_imu=args.exclude_imu, 
