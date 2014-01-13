@@ -48,6 +48,11 @@ def read_pix4uav_file(filename):
 
     fp = open(filename, 'rt')
     reader = csv.reader(fp, delimiter=',')
+    # Check if there is a header row
+    firstrow = reader.next()
+    if firstrow[0].isdigit():
+        yield tuple([s.strip() for s in firstrow])
+
     for row in reader:
         yield tuple([s.strip() for s in row])
 
