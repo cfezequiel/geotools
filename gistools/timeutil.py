@@ -1,5 +1,6 @@
 import warnings
 import time
+from os.path import getmtime
 
 # Leap seconds between UTC and GPS times
 LEAP_SECONDS = 16
@@ -26,13 +27,17 @@ def get_timestamp(filename):
     date_time_original = None
     if has_exifread:
         tags = exifread.process_file(open(filename, 'rt'))
-        if tags:
+        try:
             date_time_original = str(tags['EXIF DateTimeOriginal'])
-        else:
+        except KeyError:
             if has_exiftool:
                 with exiftool.ExifTool() as et:
                     md = et.get_metadata(filename)
-                    date_time_original = str(md['EXIF:DateTimeOriginal'])
+                    try:
+                        date_time_original = str(md['EXIF:DateTimeOriginal'])
+                    except KeyError:
+                        pass # do nothing
+
             else:
                 pass # do nothing at this point
     
@@ -41,7 +46,8 @@ def get_timestamp(filename):
         fmt = '%Y:%m:%d %H:%M:%S'
         t = time.strptime(date_time_original, fmt)
     else: # Use the image file's modified time instead
-        t = time.localtime(path.getmtime(filename))
+        warnings.warn('Using modified time of image file %s' %  filename)
+        t = time.localtime(getmtime(filename))
 
     return t
 
