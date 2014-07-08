@@ -129,7 +129,12 @@ def get_apm_version(logfile):
                 version_str = line.split()[1]
                 # Strip version number of non-numerical/decimal characters
                 non_decimal = re.compile(r'[^\d.]+')
-                version = float(non_decimal.sub('', version_str))
+                version = (non_decimal.sub('', version_str))
+                # Strip additional decimal and characters following it
+                # Ex. 3.0.3 -> 3.0
+                if version.count('.') > 1:
+                    version = version[:version.rfind('.')]
+                version = float(version)
                 break
             elif line == '':
                 break
