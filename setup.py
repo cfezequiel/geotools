@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='gistools',
-      version='0.4',
+      version='0.6',
       description='Collection of GIS utility scripts and modules',
       url='http://TODO/this/later',
       author='Carlos Ezequiel',
