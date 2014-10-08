@@ -6,7 +6,6 @@ Georeferences a set of images with GPS/IMU information.
 Currently supports APM log files only.
 
 author: Carlos F. Ezequiel
-version: 2.5
 '''
 
 import logging 
