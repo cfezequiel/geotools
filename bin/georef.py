@@ -56,15 +56,15 @@ class Image:
         self.__time_created = self.__get_time_created(root_dir + '/' + name)
 
     def __get_time_created(self, fn):
-        '''Get creation time in seconds after epoch time.'''
+        '''Get creation time in seconds since UNIX epoch.'''
 
         t = timeutil.get_timestamp(fn)
-        ts = timeutil.gps_seconds(t)
+        #ts = timeutil.gps_seconds(t)
 
         # Convert to GPS milliseconds
-        ts *= multiplier['ms']
+        #ts *= multiplier['ms']
 
-        return ts
+        return float(time.mktime(t))
 
     def filename(self):
         return self.__name
@@ -95,10 +95,16 @@ class IMU:
 class Pose:
     '''UAV pose, which includes GPS and IMU information'''
 
-    def __init__(self, time, gps, imu=None):
-        self.__time = time
+    def __init__(self, gps_time, gps, imu=None):
         self.__gps = gps
         self.__imu = imu
+
+        # Time in seconds since Unix epoch
+        gps_seconds = gps_time[0] / 1000.0
+        gps_week = gps_time[1]
+        t = timeutil.gps_time_to_seconds(gps_week, gps_seconds)
+        #t = time.mktime(time.localtime(t))
+        self.__time = float(t)
 
     def __repr__(self):
         return str((self.__time) + self.data())
@@ -209,7 +215,7 @@ def parse_apm_log_file(logfile):
     for row in reader:
         #time = int(row[1]) / multiplier['ms']
         # Use GPS milliseconds for timestamps
-        time = int(row[1])
+        time = (int(row[1]), int(row[1 + offset]))
         gps = GPS(float(row[2 + offset]), float(row[3 + offset]), float(row[4 + offset]))
         imu = IMU(float(row[5 + offset]), float(row[6 + offset]), float(row[7 + offset]))
         pose = Pose(time, gps, imu)

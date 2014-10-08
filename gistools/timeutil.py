@@ -2,9 +2,7 @@ import warnings
 import time
 from os.path import getmtime
 
-# Leap seconds between UTC and GPS times
-LEAP_SECONDS = 16
-
+# Try importing dependencies
 has_exifread = False
 has_exiftool = False
 
@@ -19,6 +17,28 @@ try:
     has_exiftool = True
 except ImportError:
     warnings.warn('Module not found: exiftool')
+
+# Leap seconds between UTC and GPS times
+LEAP_SECONDS = 16
+UNIX_EPOCH = time.gmtime(0)
+GPS_EPOCH= time.strptime('1980-01-06', '%Y-%m-%d')
+UNIX_GPS_OFFSET_S = time.mktime(GPS_EPOCH) - time.mktime(UNIX_EPOCH)
+SECONDS_PER_DAY = 86400
+DAYS_PER_WEEK = 7
+SECONDS_PER_WEEK = SECONDS_PER_DAY * DAYS_PER_WEEK
+
+def gps_time_to_seconds(gps_week, gps_seconds):
+    '''
+    Convert GPS time (GPSWeek, GPSSeconds) to seconds since Unix epoch
+    '''
+
+    days = float(gps_seconds) / SECONDS_PER_DAY 
+    daysIntoWeek = float(days) / DAYS_PER_WEEK 
+
+    weeks = gps_week + daysIntoWeek
+    seconds = weeks * SECONDS_PER_WEEK + UNIX_GPS_OFFSET_S
+
+    return seconds
 
 def get_timestamp(filename):
     '''Get file creation time from EXIF if available. If not, get file modified time.'''
