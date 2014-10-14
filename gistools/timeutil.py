@@ -1,6 +1,7 @@
 import warnings
 import time
 from os.path import getmtime
+import datetime
 
 # Try importing dependencies
 has_exifread = False
@@ -20,9 +21,10 @@ except ImportError:
 
 # Leap seconds between UTC and GPS times
 LEAP_SECONDS = 16
-UNIX_EPOCH = time.gmtime(0)
-GPS_EPOCH= time.strptime('1980-01-06', '%Y-%m-%d')
-UNIX_GPS_OFFSET_S = time.mktime(GPS_EPOCH) - time.mktime(UNIX_EPOCH)
+UNIX_EPOCH = datetime.date(1970,1,1)
+GPS_EPOCH= datetime.date(1980,1,6)
+EPOCH_DIFF= GPS_EPOCH - UNIX_EPOCH
+UNIX_GPS_OFFSET_S = EPOCH_DIFF.days*24*3600+EPOCH_DIFF.seconds
 SECONDS_PER_DAY = 86400
 DAYS_PER_WEEK = 7
 SECONDS_PER_WEEK = SECONDS_PER_DAY * DAYS_PER_WEEK
