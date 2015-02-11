@@ -1,6 +1,0 @@
-Third-party Libraries Needed:
-exifread (via pip)
-py-exiftool (git://github.com/smarnach/pyexiftool.git)
-gpxpy (customized: version 0.9.6s)
-- Can be found in Trello/Data Processing/Reference
-
