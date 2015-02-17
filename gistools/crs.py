@@ -2,7 +2,7 @@ import math
 
 # function derived from:
 # http://stackoverflow.com/questions/343865/how-to-convert-from-utm-to-latlng-in-python-or-javascript 
-def utmToLatLng(zone, easting, northing, northernHemisphere=True):
+def utm2dd(zone, easting, northing, northernHemisphere=True):
     if not northernHemisphere:
         northing = 10000000 - northing
 
