@@ -12,20 +12,20 @@ from gistools.fmt import WorldFile, MMTile
 VALID_FILE_EXT = ['.JPG']
 
 # PARAMETERS
-BASE_URL = 'https://s3-ap-southeast-1.amazonaws.com/skyeye-multiform/micromappers/typhoon-ruby'
+BASE_URL = 'https://s3-ap-southeast-1.amazonaws.com/'
 ZONE = 51
 IS_NORTH = True
 
 if __name__ == '__main__':
 
-    if len(sys.argv) < 2:
-        print 'Usage: python %s <.JPG+.JGw directory>' % path.basename(sys.argv[0])
+    if len(sys.argv) < 3:
+        print 'Usage: python %s <.JPG+.JGw directory> <AWS s3 path>>' % path.basename(sys.argv[0])
+        print 'Current AWS URL: %s' % BASE_URL
         exit(1)
 
-    src_dir = sys.argv[1]
+    url = BASE_URL + sys.argv[2]
 
-    curdir = path.split(path.realpath(path.curdir))[1]
-    url = BASE_URL + '/' + curdir
+    src_dir = sys.argv[1]
 
     # Read input directory images
     tile_image_files = ['%s/%s' % (src_dir, f) for f in listdir(src_dir) \
