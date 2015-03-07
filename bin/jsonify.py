@@ -12,7 +12,7 @@ from gistools.fmt import WorldFile, MMTile
 VALID_FILE_EXT = ['.JPG']
 
 # PARAMETERS
-BASE_URL = 'https://s3-ap-southeast-1.amazonaws.com/skyeye-multiform/micromappers-sample2'
+BASE_URL = 'https://s3-ap-southeast-1.amazonaws.com/skyeye-multiform/micromappers/typhoon-ruby'
 ZONE = 51
 IS_NORTH = True
 
@@ -23,6 +23,9 @@ if __name__ == '__main__':
         exit(1)
 
     src_dir = sys.argv[1]
+
+    curdir = path.split(path.realpath(path.curdir))[1]
+    url = BASE_URL + '/' + curdir
 
     # Read input directory images
     tile_image_files = ['%s/%s' % (src_dir, f) for f in listdir(src_dir) \
@@ -44,7 +47,7 @@ if __name__ == '__main__':
         (north, east) = utm2dd(ZONE, wf.lrx, wf.uly, IS_NORTH)
         (south, west) = utm2dd(ZONE, wf.ulx, wf.lly, IS_NORTH)
 
-        tile = MMTile(north, east, west, south, imgwidth, imgheight, BASE_URL, f)
+        tile = MMTile(north, east, west, south, imgwidth, imgheight, url, f)
 
         # Create JSON entry
         tiles.append(tile.data)
