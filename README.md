@@ -25,3 +25,4 @@ Executable scripts can be found in `bin/`
 - georefvid.py: Georeferences GoPro video-based frames.
 - obliquelabel.py: Label entries of a georeferencing CSV file to determine whether image is oblique (i.e. non-orthogonal) or not.
 - wf2grid.py: Transform world file into a CSV containing filename and grid coordinates.
+
