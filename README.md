@@ -1,7 +1,7 @@
 # geotools #
 
 * Python tools for  processing of geospatial data
-* Version 0.7
+* Version 0.8
 
 ## Installation ##
 
